@@ -1,90 +1,57 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Cloud Automation Tool</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; text-align: center; background: #f4f7f6; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; width: 90%; max-width: 500px; }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-        button { background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:disabled { background: #ccc; }
-        #timer { font-size: 50px; color: #d9534f; margin: 20px 0; font-weight: bold; }
-        #log { text-align: left; font-family: monospace; font-size: 13px; background: #222; color: #0f0; padding: 15px; border-radius: 5px; margin-top: 20px; height: 150px; overflow-y: auto; }
-    </style>
-</head>
-<body>
+<?php
+// Increase time for the 12-minute process
+set_time_limit(1000);
+ignore_user_abort(true);
 
-<div class="card">
-    <h2>AF Goal Automation</h2>
-    <p>Wait 4 mins → Execute all steps</p>
-    <input type="text" id="af_link" placeholder="Paste AppsFlyer Link here...">
-    <br>
-    <button id="startBtn" onclick="initiate()">Start Countdown</button>
+$botToken = "8377621786:AAGXu6_8ZNwDpWaTTzvbLZYz4LFoYKQw2UA";
+$website = "https://api.telegram.org/bot" . $botToken;
 
-    <div id="countdownArea" style="display:none;">
-        <div id="timer">240</div>
-        <p>Stay on this page...</p>
-    </div>
+$content = file_get_contents("php://input");
+$update = json_decode($content, true);
 
-    <div id="log" style="display:none;"></div>
-</div>
+if (!$update) {
+    echo "Bot is running...";
+    exit;
+}
 
-<script>
-    async function initiate() {
-        const link = document.getElementById('af_link').value;
-        const log = document.getElementById('log');
-        const btn = document.getElementById('startBtn');
-        
-        // Extract ClickID
-        let clickid = "";
-        try {
-            const url = new URL(link);
-            clickid = url.searchParams.get('clickid');
-        } catch(e) { 
-            alert("Invalid URL"); return; 
-        }
+$chatId = $update["message"]["chat"]["id"];
+$message = $update["message"]["text"];
 
-        if (!clickid) { alert("ClickID not found!"); return; }
+if (filter_var($message, FILTER_VALIDATE_URL)) {
+    $url_parts = parse_url($message);
+    parse_str($url_parts['query'] ?? '', $params);
+    $clickid = $params['clickid'] ?? '';
 
-        btn.disabled = true;
-        document.getElementById('countdownArea').style.display = 'block';
-        log.style.display = 'block';
-        log.innerHTML = `> Extracted ClickID: ${clickid}<br>> Starting 4-minute timer...<br>`;
-
-        let seconds = 240;
-        const timerDisplay = document.getElementById('timer');
-
-        const countdown = setInterval(async () => {
-            seconds--;
-            timerDisplay.innerText = seconds;
-
-            if (seconds <= 0) {
-                clearInterval(countdown);
-                timerDisplay.innerText = "GO!";
-                
-                const target = "https://akshit-bro.in/adcounty.php?i=2";
-                const goals = ["", "ds_purchase_success_screen_load", "dg_purchase_success_screen_load"];
-
-                for (let goal of goals) {
-                    log.innerHTML += `> Sending Goal: ${goal || 'None'}... `;
-                    
-                    const formData = new FormData();
-                    formData.append('clickid', clickid);
-                    formData.append('goal', goal);
-
-                    try {
-                        // Standard browser fetch
-                        await fetch(target, { method: 'POST', body: formData, mode: 'no-cors' });
-                        log.innerHTML += `<span style="color:white;">DONE</span><br>`;
-                    } catch (err) {
-                        log.innerHTML += `<span style="color:red;">FAILED</span><br>`;
-                    }
-                }
-                log.innerHTML += `> <b>All process finished!</b>`;
-            }
-        }, 1000);
+    if (empty($clickid)) {
+        file_get_contents($website . "/sendMessage?chat_id=$chatId&text=" . urlencode("❌ ClickID not found!"));
+        exit;
     }
-</script>
 
-</body>
-</html>
+    file_get_contents($website . "/sendMessage?chat_id=$chatId&text=" . urlencode("✅ Starting 12-min process for ClickID: $clickid"));
+
+    // Step 1: Wait 4 min then send ClickID
+    sleep(240);
+    hitSite($clickid, "");
+    file_get_contents($website . "/sendMessage?chat_id=$chatId&text=" . urlencode("🔔 Step 1 Done"));
+
+    // Step 2: Wait 4 min then Goal 1
+    sleep(240);
+    hitSite($clickid, "ds_purchase_success_screen_load");
+    file_get_contents($website . "/sendMessage?chat_id=$chatId&text=" . urlencode("🔔 Step 2 Done"));
+
+    // Step 3: Wait 4 min then Goal 2
+    sleep(240);
+    hitSite($clickid, "dg_purchase_success_screen_load");
+    file_get_contents($website . "/sendMessage?chat_id=$chatId&text=" . urlencode("🏁 Process Finished!"));
+
+}
+
+function hitSite($id, $goal) {
+    $target = "http://akshit-bro.in/adcounty.php?i=2";
+    $ch = curl_init($target);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['clickid' => $id, 'goal' => $goal]));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_exec($ch);
+    curl_close($ch);
+}
