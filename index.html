@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cloud Automation Tool</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; text-align: center; background: #f4f7f6; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; width: 90%; max-width: 500px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:disabled { background: #ccc; }
+        #timer { font-size: 50px; color: #d9534f; margin: 20px 0; font-weight: bold; }
+        #log { text-align: left; font-family: monospace; font-size: 13px; background: #222; color: #0f0; padding: 15px; border-radius: 5px; margin-top: 20px; height: 150px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>AF Goal Automation</h2>
+    <p>Wait 4 mins → Execute all steps</p>
+    <input type="text" id="af_link" placeholder="Paste AppsFlyer Link here...">
+    <br>
+    <button id="startBtn" onclick="initiate()">Start Countdown</button>
+
+    <div id="countdownArea" style="display:none;">
+        <div id="timer">240</div>
+        <p>Stay on this page...</p>
+    </div>
+
+    <div id="log" style="display:none;"></div>
+</div>
+
+<script>
+    async function initiate() {
+        const link = document.getElementById('af_link').value;
+        const log = document.getElementById('log');
+        const btn = document.getElementById('startBtn');
+        
+        // Extract ClickID
+        let clickid = "";
+        try {
+            const url = new URL(link);
+            clickid = url.searchParams.get('clickid');
+        } catch(e) { 
+            alert("Invalid URL"); return; 
+        }
+
+        if (!clickid) { alert("ClickID not found!"); return; }
+
+        btn.disabled = true;
+        document.getElementById('countdownArea').style.display = 'block';
+        log.style.display = 'block';
+        log.innerHTML = `> Extracted ClickID: ${clickid}<br>> Starting 4-minute timer...<br>`;
+
+        let seconds = 240;
+        const timerDisplay = document.getElementById('timer');
+
+        const countdown = setInterval(async () => {
+            seconds--;
+            timerDisplay.innerText = seconds;
+
+            if (seconds <= 0) {
+                clearInterval(countdown);
+                timerDisplay.innerText = "GO!";
+                
+                const target = "https://akshit-bro.in/adcounty.php?i=2";
+                const goals = ["", "ds_purchase_success_screen_load", "dg_purchase_success_screen_load"];
+
+                for (let goal of goals) {
+                    log.innerHTML += `> Sending Goal: ${goal || 'None'}... `;
+                    
+                    const formData = new FormData();
+                    formData.append('clickid', clickid);
+                    formData.append('goal', goal);
+
+                    try {
+                        // Standard browser fetch
+                        await fetch(target, { method: 'POST', body: formData, mode: 'no-cors' });
+                        log.innerHTML += `<span style="color:white;">DONE</span><br>`;
+                    } catch (err) {
+                        log.innerHTML += `<span style="color:red;">FAILED</span><br>`;
+                    }
+                }
+                log.innerHTML += `> <b>All process finished!</b>`;
+            }
+        }, 1000);
+    }
+</script>
+
+</body>
+</html>
